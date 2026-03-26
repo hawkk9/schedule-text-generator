@@ -316,11 +316,72 @@
 <script>
 const DOW_JA = ['日','月','火','水','木','金','土'];
 
-// State
-let viewYear, viewMonth;
-const selected = new Map(); // key: "YYYY-MM-DD" → { start: "HH:MM", end: "HH:MM" }
+// ── ScheduleStore ─────────────────────────────────────────────
+const ScheduleStore = (() => {
+  const _state = new Map(); // key: DateKey → ScheduleEntry
+  const _subs = [];
 
-// Init with current month
+  function _notify() { _subs.forEach(cb => cb()); }
+
+  return {
+    getState() { return _state; },
+
+    toggleDate(date, dateKey) {
+      if (_state.has(dateKey)) _state.delete(dateKey);
+      else _state.set(dateKey, { date, dateKey, start: '', end: '' });
+      _notify();
+    },
+
+    updateTime(dateKey, start, end) {
+      const entry = _state.get(dateKey);
+      if (entry) { entry.start = start; entry.end = end; _notify(); }
+    },
+
+    subscribe(cb) {
+      _subs.push(cb);
+      return () => { const i = _subs.indexOf(cb); if (i >= 0) _subs.splice(i, 1); };
+    }
+  };
+})();
+
+// ── TextFormatter ─────────────────────────────────────────────
+const TextFormatter = (() => {
+  function getDayOfWeekJa(date) {
+    return ['日','月','火','水','木','金','土'][date.getDay()];
+  }
+
+  // Returns formatted line string, or null if entry has a time validation error
+  function formatLine(entry) {
+    const { date, start, end } = entry;
+    if (start && end && end <= start) return null; // バリデーションエラー → 除外
+
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    const dow = getDayOfWeekJa(date);
+
+    let line = `${y}/${m}/${d}(${dow})`;
+    if (start || end) {
+      line += ` ${start || '--:--'}~${end || '--:--'}`;
+    }
+    return line;
+  }
+
+  // Returns formatted text (newline-joined), or "" when state is empty
+  function formatEntries(state) {
+    if (state.size === 0) return '';
+    const lines = [...state.keys()]
+      .sort()
+      .map(key => formatLine(state.get(key)))
+      .filter(line => line !== null);
+    return lines.join('\n');
+  }
+
+  return { formatEntries, getDayOfWeekJa, formatLine };
+})();
+
+// Calendar view state
+let viewYear, viewMonth;
 const now = new Date();
 viewYear = now.getFullYear();
 viewMonth = now.getMonth();
@@ -333,19 +394,18 @@ function renderCalendar() {
   const grid = document.getElementById('calGrid');
   grid.innerHTML = '';
 
-  // Day-of-week headers
-  DOW_JA.forEach((d, i) => {
+  DOW_JA.forEach(d => {
     const el = document.createElement('div');
     el.className = 'cal-dow';
     el.textContent = d;
     grid.appendChild(el);
   });
 
-  const firstDay = new Date(viewYear, viewMonth, 1).getDay(); // 0=Sun
+  const firstDay = new Date(viewYear, viewMonth, 1).getDay();
   const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
   const todayStr = dateKey(now);
+  const state = ScheduleStore.getState();
 
-  // Empty cells before 1st
   for (let i = 0; i < firstDay; i++) {
     const el = document.createElement('div');
     el.className = 'cal-day empty';
@@ -363,9 +423,13 @@ function renderCalendar() {
     if (dow === 0) el.classList.add('sun');
     if (dow === 6) el.classList.add('sat');
     if (key === todayStr) el.classList.add('today');
-    if (selected.has(key)) el.classList.add('selected');
+    if (state.has(key)) el.classList.add('selected');
 
-    el.addEventListener('click', () => toggleDate(date, key, el));
+    el.addEventListener('click', () => {
+      ScheduleStore.toggleDate(date, key); // → notifies renderOutput
+      el.classList.toggle('selected', ScheduleStore.getState().has(key));
+      renderDateList();
+    });
     grid.appendChild(el);
   }
 }
@@ -375,18 +439,6 @@ function dateKey(date) {
   const m = String(date.getMonth() + 1).padStart(2, '0');
   const d = String(date.getDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
-}
-
-function toggleDate(date, key, el) {
-  if (selected.has(key)) {
-    selected.delete(key);
-    el.classList.remove('selected');
-  } else {
-    selected.set(key, { date, start: '', end: '' });
-    el.classList.add('selected');
-  }
-  renderDateList();
-  renderOutput();
 }
 
 document.getElementById('prevBtn').addEventListener('click', () => {
@@ -501,15 +553,17 @@ function renderDateList() {
   const list = document.getElementById('dateList');
   list.innerHTML = '';
 
-  if (selected.size === 0) {
+  const state = ScheduleStore.getState();
+
+  if (state.size === 0) {
     list.innerHTML = '<p class="empty-hint">カレンダーから日付を選択してください</p>';
     return;
   }
 
-  const sortedKeys = [...selected.keys()].sort();
+  const sortedKeys = [...state.keys()].sort();
 
   sortedKeys.forEach(key => {
-    const entry = selected.get(key);
+    const entry = state.get(key);
     const { date } = entry;
     const dow = DOW_JA[date.getDay()];
     const y = date.getFullYear();
@@ -533,14 +587,12 @@ function renderDateList() {
     function onTimeChange() {
       const s = startPicker.getValue();
       const e = endPicker.getValue();
-      entry.start = s;
-      entry.end = e;
       if (s && e && e <= s) {
         errMsg.textContent = '終了 > 開始にしてください';
       } else {
         errMsg.textContent = '';
       }
-      renderOutput();
+      ScheduleStore.updateTime(key, s, e); // → notifies renderOutput via subscribe
     }
 
     const startPicker = makeTimePicker(entry.start, onTimeChange);
@@ -558,38 +610,18 @@ function renderDateList() {
 // ── Output render ────────────────────────────────────────────
 function renderOutput() {
   const el = document.getElementById('outputText');
-  if (selected.size === 0) {
+  const state = ScheduleStore.getState();
+
+  if (state.size === 0) {
     el.innerHTML = '<span class="output-placeholder">日付と時間を入力すると、ここにテキストが表示されます</span>';
     return;
   }
 
-  const sortedKeys = [...selected.keys()].sort();
-  const lines = [];
-
-  for (const key of sortedKeys) {
-    const entry = selected.get(key);
-    const { date, start, end } = entry;
-    const dow = DOW_JA[date.getDay()];
-    const y = date.getFullYear();
-    const m = String(date.getMonth() + 1).padStart(2, '0');
-    const d = String(date.getDate()).padStart(2, '0');
-
-    const hasError = start && end && end <= start;
-    if (hasError) continue;
-
-    let line = `${y}/${m}/${d}(${dow})`;
-    if (start || end) {
-      const s = start || '--:--';
-      const e = end   || '--:--';
-      line += ` ${s}~${e}`;
-    }
-    lines.push(line);
-  }
-
-  if (lines.length === 0) {
+  const text = TextFormatter.formatEntries(state);
+  if (!text) {
     el.innerHTML = '<span class="output-placeholder">時間を入力してください（終了 > 開始）</span>';
   } else {
-    el.textContent = lines.join('\n');
+    el.textContent = text;
   }
 }
 
@@ -619,7 +651,9 @@ document.getElementById('copyBtn').addEventListener('click', async () => {
 });
 
 // ── Init ─────────────────────────────────────────────────────
+ScheduleStore.subscribe(renderOutput); // TextOutputPanel subscribes to state changes
 renderCalendar();
+renderDateList();
 </script>
 </body>
 </html>
