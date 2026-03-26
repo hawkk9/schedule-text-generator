@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>スケジュールテキストジェネレーター</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #f5f5f7;
+    color: #1d1d1f;
+    min-height: 100vh;
+    padding: 24px 16px;
+  }
+
+  h1 {
+    font-size: 1.4rem;
+    font-weight: 600;
+    text-align: center;
+    margin-bottom: 24px;
+    color: #1d1d1f;
+  }
+
+  .container {
+    max-width: 860px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 20px;
+    align-items: start;
+  }
+
+  /* ── Calendar ── */
+  .calendar-wrap {
+    background: #fff;
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.08);
+    width: 300px;
+  }
+
+  .cal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+
+  .cal-header span {
+    font-weight: 600;
+    font-size: .95rem;
+  }
+
+  .cal-nav {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1.1rem;
+    color: #555;
+    padding: 4px 8px;
+    border-radius: 8px;
+    transition: background .15s;
+  }
+  .cal-nav:hover { background: #f0f0f0; }
+
+  .cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+  }
+
+  .cal-dow {
+    text-align: center;
+    font-size: .72rem;
+    font-weight: 600;
+    color: #888;
+    padding: 4px 0;
+  }
+  .cal-dow:first-child { color: #e05; }
+  .cal-dow:last-child  { color: #07f; }
+
+  .cal-day {
+    text-align: center;
+    padding: 7px 0;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: .88rem;
+    transition: background .12s, color .12s;
+    user-select: none;
+  }
+  .cal-day:hover:not(.empty):not(.selected) { background: #f0f0f0; }
+  .cal-day.empty { cursor: default; }
+  .cal-day.selected {
+    background: #0071e3;
+    color: #fff;
+    font-weight: 600;
+  }
+  .cal-day.today:not(.selected) {
+    color: #0071e3;
+    font-weight: 700;
+  }
+  .cal-day.sun:not(.selected) { color: #e05; }
+  .cal-day.sat:not(.selected) { color: #07f; }
+
+  /* ── Right column ── */
+  .right-col {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  /* ── Date rows ── */
+  .date-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .date-row {
+    background: #fff;
+    border-radius: 12px;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.07);
+    animation: fadeIn .15s ease;
+  }
+
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; } }
+
+  .date-label {
+    font-size: .9rem;
+    font-weight: 500;
+    white-space: nowrap;
+    min-width: 130px;
+    color: #333;
+  }
+
+  .time-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+  }
+
+  .tilde { color: #888; font-size: .9rem; }
+
+  .time-error {
+    font-size: .75rem;
+    color: #e05;
+    margin-left: 4px;
+  }
+
+  /* ── Time Picker ── */
+  .tp {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .tp-hour {
+    border: 1.5px solid #d0d0d5;
+    border-radius: 8px;
+    padding: 5px 6px;
+    font-size: .9rem;
+    outline: none;
+    background: #fafafa;
+    cursor: pointer;
+    transition: border-color .15s;
+    appearance: none;
+    -webkit-appearance: none;
+    text-align: center;
+    width: 54px;
+  }
+  .tp-hour:focus { border-color: #0071e3; background: #fff; }
+  .tp-hour.error { border-color: #e05; }
+
+  .tp-sep { color: #555; font-weight: 600; font-size: .9rem; }
+
+  .tp-min-sel {
+    border: 1.5px solid #d0d0d5;
+    border-radius: 8px;
+    padding: 5px 6px;
+    font-size: .9rem;
+    outline: none;
+    background: #fafafa;
+    cursor: pointer;
+    transition: border-color .15s;
+    appearance: none;
+    -webkit-appearance: none;
+    text-align: center;
+    width: 70px;
+  }
+  .tp-min-sel:focus { border-color: #0071e3; background: #fff; }
+
+  .tp-min-custom {
+    border: 1.5px solid #d0d0d5;
+    border-radius: 8px;
+    padding: 5px 8px;
+    font-size: .9rem;
+    outline: none;
+    width: 60px;
+    background: #fafafa;
+    text-align: center;
+    transition: border-color .15s;
+  }
+  .tp-min-custom:focus { border-color: #0071e3; background: #fff; }
+
+  .empty-hint {
+    text-align: center;
+    color: #aaa;
+    font-size: .88rem;
+    padding: 24px 0;
+  }
+
+  /* ── Output ── */
+  .output-wrap {
+    background: #fff;
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.08);
+  }
+
+  .output-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+
+  .output-label {
+    font-size: .82rem;
+    font-weight: 600;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+  }
+
+  .copy-btn {
+    background: #0071e3;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 6px 16px;
+    font-size: .85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background .15s, transform .1s;
+  }
+  .copy-btn:hover { background: #0062c4; }
+  .copy-btn:active { transform: scale(.97); }
+  .copy-btn.copied { background: #34c759; }
+
+  .output-text {
+    font-family: 'SF Mono', 'Menlo', 'Consolas', monospace;
+    font-size: .95rem;
+    line-height: 1.8;
+    white-space: pre;
+    color: #1d1d1f;
+    min-height: 48px;
+    background: #f5f5f7;
+    border-radius: 8px;
+    padding: 12px 14px;
+  }
+
+  .output-placeholder {
+    color: #bbb;
+    font-style: italic;
+    font-family: -apple-system, sans-serif;
+    font-size: .88rem;
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 660px) {
+    .container { grid-template-columns: 1fr; }
+    .calendar-wrap { width: 100%; }
+    .date-row { flex-wrap: wrap; }
+  }
+</style>
+</head>
+<body>
+
+<h1>スケジュールテキストジェネレーター</h1>
+
+<div class="container">
+  <!-- Calendar -->
+  <div class="calendar-wrap">
+    <div class="cal-header">
+      <button class="cal-nav" id="prevBtn">‹</button>
+      <span id="calTitle"></span>
+      <button class="cal-nav" id="nextBtn">›</button>
+    </div>
+    <div class="cal-grid" id="calGrid"></div>
+  </div>
+
+  <!-- Right -->
+  <div class="right-col">
+    <div class="date-list" id="dateList">
+      <p class="empty-hint">カレンダーから日付を選択してください</p>
+    </div>
+    <div class="output-wrap">
+      <div class="output-header">
+        <span class="output-label">生成テキスト</span>
+        <button class="copy-btn" id="copyBtn">コピー</button>
+      </div>
+      <div class="output-text" id="outputText">
+        <span class="output-placeholder">日付と時間を入力すると、ここにテキストが表示されます</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const DOW_JA = ['日','月','火','水','木','金','土'];
+
+// State
+let viewYear, viewMonth;
+const selected = new Map(); // key: "YYYY-MM-DD" → { start: "HH:MM", end: "HH:MM" }
+
+// Init with current month
+const now = new Date();
+viewYear = now.getFullYear();
+viewMonth = now.getMonth();
+
+// ── Calendar render ──────────────────────────────────────────
+function renderCalendar() {
+  const title = document.getElementById('calTitle');
+  title.textContent = `${viewYear}年${viewMonth + 1}月`;
+
+  const grid = document.getElementById('calGrid');
+  grid.innerHTML = '';
+
+  // Day-of-week headers
+  DOW_JA.forEach((d, i) => {
+    const el = document.createElement('div');
+    el.className = 'cal-dow';
+    el.textContent = d;
+    grid.appendChild(el);
+  });
+
+  const firstDay = new Date(viewYear, viewMonth, 1).getDay(); // 0=Sun
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+  const todayStr = dateKey(now);
+
+  // Empty cells before 1st
+  for (let i = 0; i < firstDay; i++) {
+    const el = document.createElement('div');
+    el.className = 'cal-day empty';
+    grid.appendChild(el);
+  }
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const date = new Date(viewYear, viewMonth, d);
+    const key = dateKey(date);
+    const dow = date.getDay();
+
+    const el = document.createElement('div');
+    el.textContent = d;
+    el.className = 'cal-day';
+    if (dow === 0) el.classList.add('sun');
+    if (dow === 6) el.classList.add('sat');
+    if (key === todayStr) el.classList.add('today');
+    if (selected.has(key)) el.classList.add('selected');
+
+    el.addEventListener('click', () => toggleDate(date, key, el));
+    grid.appendChild(el);
+  }
+}
+
+function dateKey(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function toggleDate(date, key, el) {
+  if (selected.has(key)) {
+    selected.delete(key);
+    el.classList.remove('selected');
+  } else {
+    selected.set(key, { date, start: '', end: '' });
+    el.classList.add('selected');
+  }
+  renderDateList();
+  renderOutput();
+}
+
+document.getElementById('prevBtn').addEventListener('click', () => {
+  viewMonth--;
+  if (viewMonth < 0) { viewMonth = 11; viewYear--; }
+  renderCalendar();
+});
+
+document.getElementById('nextBtn').addEventListener('click', () => {
+  viewMonth++;
+  if (viewMonth > 11) { viewMonth = 0; viewYear++; }
+  renderCalendar();
+});
+
+// ── Time Picker Component ─────────────────────────────────────
+// Returns { el, getValue() }
+// initialValue: "HH:MM" or ""
+function makeTimePicker(initialValue, onChange) {
+  let hour = '';      // "" | "00".."23"
+  let minute = '';    // "" | "00" | "30" | custom string
+
+  // Parse initial value
+  if (initialValue && /^\d{2}:\d{2}$/.test(initialValue)) {
+    hour = initialValue.slice(0, 2);
+    minute = initialValue.slice(3);
+  }
+
+  const wrap = document.createElement('div');
+  wrap.className = 'tp';
+
+  // ── Hour select ──
+  const hourSel = document.createElement('select');
+  hourSel.className = 'tp-hour';
+
+  const blankOpt = document.createElement('option');
+  blankOpt.value = '';
+  blankOpt.textContent = '--';
+  hourSel.appendChild(blankOpt);
+
+  for (let h = 0; h <= 23; h++) {
+    const opt = document.createElement('option');
+    opt.value = String(h).padStart(2, '0');
+    opt.textContent = String(h).padStart(2, '0');
+    hourSel.appendChild(opt);
+  }
+  hourSel.value = hour;
+  hourSel.addEventListener('change', () => {
+    hour = hourSel.value;
+    onChange(getValue());
+  });
+
+  const sep = document.createElement('span');
+  sep.className = 'tp-sep';
+  sep.textContent = ':';
+
+  // ── Minute select ──
+  const isCustom = minute !== '' && minute !== '00' && minute !== '30';
+
+  const minSel = document.createElement('select');
+  minSel.className = 'tp-min-sel';
+  [['', '--'], ['00', '00'], ['30', '30'], ['other', 'その他']].forEach(([val, label]) => {
+    const opt = document.createElement('option');
+    opt.value = val;
+    opt.textContent = label;
+    minSel.appendChild(opt);
+  });
+  minSel.value = isCustom ? 'other' : (minute || '');
+
+  // Custom text input (visible only when 'その他' selected)
+  const customInput = document.createElement('input');
+  customInput.type = 'text';
+  customInput.className = 'tp-min-custom';
+  customInput.placeholder = '分';
+  customInput.maxLength = 2;
+  customInput.style.display = isCustom ? '' : 'none';
+  if (isCustom) customInput.value = minute;
+
+  customInput.addEventListener('input', () => {
+    const v = customInput.value.replace(/\D/g, '').slice(0, 2);
+    customInput.value = v;
+    const n = parseInt(v, 10);
+    minute = (v !== '' && n >= 0 && n <= 59) ? String(n).padStart(2, '0') : '';
+    onChange(getValue());
+  });
+
+  minSel.addEventListener('change', () => {
+    const val = minSel.value;
+    if (val === 'other') {
+      customInput.style.display = '';
+      minute = '';
+      customInput.value = '';
+      customInput.focus();
+    } else {
+      customInput.style.display = 'none';
+      minute = val;
+    }
+    onChange(getValue());
+  });
+
+  wrap.append(hourSel, sep, minSel, customInput);
+
+  function getValue() {
+    if (hour === '' || minute === '') return '';
+    return `${hour}:${minute}`;
+  }
+
+  return { el: wrap, getValue };
+}
+
+// ── Date list render ─────────────────────────────────────────
+function renderDateList() {
+  const list = document.getElementById('dateList');
+  list.innerHTML = '';
+
+  if (selected.size === 0) {
+    list.innerHTML = '<p class="empty-hint">カレンダーから日付を選択してください</p>';
+    return;
+  }
+
+  const sortedKeys = [...selected.keys()].sort();
+
+  sortedKeys.forEach(key => {
+    const entry = selected.get(key);
+    const { date } = entry;
+    const dow = DOW_JA[date.getDay()];
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    const labelText = `${y}/${m}/${d}(${dow})`;
+
+    const row = document.createElement('div');
+    row.className = 'date-row';
+
+    const label = document.createElement('div');
+    label.className = 'date-label';
+    label.textContent = labelText;
+
+    const timeGroup = document.createElement('div');
+    timeGroup.className = 'time-group';
+
+    const errMsg = document.createElement('span');
+    errMsg.className = 'time-error';
+
+    function onTimeChange() {
+      const s = startPicker.getValue();
+      const e = endPicker.getValue();
+      entry.start = s;
+      entry.end = e;
+      if (s && e && e <= s) {
+        errMsg.textContent = '終了 > 開始にしてください';
+      } else {
+        errMsg.textContent = '';
+      }
+      renderOutput();
+    }
+
+    const startPicker = makeTimePicker(entry.start, onTimeChange);
+    const tilde = document.createElement('span');
+    tilde.className = 'tilde';
+    tilde.textContent = '〜';
+    const endPicker = makeTimePicker(entry.end, onTimeChange);
+
+    timeGroup.append(startPicker.el, tilde, endPicker.el, errMsg);
+    row.append(label, timeGroup);
+    list.appendChild(row);
+  });
+}
+
+// ── Output render ────────────────────────────────────────────
+function renderOutput() {
+  const el = document.getElementById('outputText');
+  if (selected.size === 0) {
+    el.innerHTML = '<span class="output-placeholder">日付と時間を入力すると、ここにテキストが表示されます</span>';
+    return;
+  }
+
+  const sortedKeys = [...selected.keys()].sort();
+  const lines = [];
+
+  for (const key of sortedKeys) {
+    const entry = selected.get(key);
+    const { date, start, end } = entry;
+    const dow = DOW_JA[date.getDay()];
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+
+    const hasError = start && end && end <= start;
+    if (hasError) continue;
+
+    let line = `${y}/${m}/${d}(${dow})`;
+    if (start || end) {
+      const s = start || '--:--';
+      const e = end   || '--:--';
+      line += ` ${s}~${e}`;
+    }
+    lines.push(line);
+  }
+
+  if (lines.length === 0) {
+    el.innerHTML = '<span class="output-placeholder">時間を入力してください（終了 > 開始）</span>';
+  } else {
+    el.textContent = lines.join('\n');
+  }
+}
+
+// ── Copy ─────────────────────────────────────────────────────
+document.getElementById('copyBtn').addEventListener('click', async () => {
+  const text = document.getElementById('outputText').textContent.trim();
+  if (!text || document.querySelector('.output-placeholder')) return;
+
+  const btn = document.getElementById('copyBtn');
+  try {
+    await navigator.clipboard.writeText(text);
+    btn.textContent = 'コピーしました！';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = 'コピー';
+      btn.classList.remove('copied');
+    }, 2000);
+  } catch {
+    // Fallback: select text
+    const range = document.createRange();
+    range.selectNode(document.getElementById('outputText'));
+    window.getSelection().removeAllRanges();
+    window.getSelection().addRange(range);
+    btn.textContent = 'テキストを選択しました';
+    setTimeout(() => { btn.textContent = 'コピー'; }, 2000);
+  }
+});
+
+// ── Init ─────────────────────────────────────────────────────
+renderCalendar();
+</script>
+</body>
+</html>
