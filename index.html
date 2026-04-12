@@ -261,9 +261,39 @@
   }
 
   /* ── Google Calendar ── */
-  .gcal-section {
+  .gcal-toggle {
     max-width: 860px;
     margin: 20px auto 0;
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.08);
+    overflow: hidden;
+  }
+
+  .gcal-toggle summary {
+    list-style: none;
+    cursor: pointer;
+    padding: 16px 20px;
+    font-size: .95rem;
+    font-weight: 600;
+    color: #1d1d1f;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    user-select: none;
+  }
+  .gcal-toggle summary::-webkit-details-marker { display: none; }
+
+  .gcal-toggle summary::after {
+    content: '▾';
+    font-size: .9rem;
+    color: #888;
+    transition: transform .15s ease;
+  }
+  .gcal-toggle[open] summary::after { transform: rotate(180deg); }
+
+  .gcal-section {
+    padding: 0 20px 20px;
   }
 
   .gcal-header {
@@ -297,15 +327,13 @@
     height: 500px;
     border: none;
     border-radius: 16px;
-    box-shadow: 0 2px 8px rgba(0,0,0,.08);
     display: block;
   }
 
   .gcal-setup {
-    background: #fff;
+    background: #f5f5f7;
     border-radius: 16px;
     padding: 24px 20px;
-    box-shadow: 0 2px 8px rgba(0,0,0,.08);
     text-align: center;
   }
 
@@ -398,9 +426,12 @@
   </div>
 </div>
 
-<div class="gcal-section" id="gcalSection">
-  <!-- JS で setup または iframe を描画 -->
-</div>
+<details class="gcal-toggle" id="gcalToggle">
+  <summary>Googleカレンダーを並べて表示</summary>
+  <div class="gcal-section" id="gcalSection">
+    <!-- JS で setup または iframe を描画 -->
+  </div>
+</details>
 
 <script>
 const DOW_JA = ['日','月','火','水','木','金','土'];
@@ -716,6 +747,7 @@ document.getElementById('copyBtn').addEventListener('click', async () => {
 
 // ── Google Calendar embed ────────────────────────────────────
 const GCAL_KEY = 'gcal_embed_url';
+const GCAL_TOGGLE_KEY = 'gcal_toggle_open';
 
 function renderGcal() {
   const section = document.getElementById('gcalSection');
@@ -760,10 +792,21 @@ function renderGcal() {
   }
 }
 
+function initGcalToggle() {
+  const toggle = document.getElementById('gcalToggle');
+  const savedState = localStorage.getItem(GCAL_TOGGLE_KEY);
+
+  toggle.open = savedState === 'true';
+  toggle.addEventListener('toggle', () => {
+    localStorage.setItem(GCAL_TOGGLE_KEY, String(toggle.open));
+  });
+}
+
 // ── Init ─────────────────────────────────────────────────────
 ScheduleStore.subscribe(renderOutput); // TextOutputPanel subscribes to state changes
 renderCalendar();
 renderDateList();
+initGcalToggle();
 renderGcal();
 </script>
 </body>
