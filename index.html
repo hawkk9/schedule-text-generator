@@ -192,22 +192,9 @@
     appearance: none;
     -webkit-appearance: none;
     text-align: center;
-    width: 70px;
+    width: 54px;
   }
   .tp-min-sel:focus { border-color: #0071e3; background: #fff; }
-
-  .tp-min-custom {
-    border: 1.5px solid #d0d0d5;
-    border-radius: 8px;
-    padding: 5px 8px;
-    font-size: .9rem;
-    outline: none;
-    width: 60px;
-    background: #fafafa;
-    text-align: center;
-    transition: border-color .15s;
-  }
-  .tp-min-custom:focus { border-color: #0071e3; background: #fff; }
 
   .empty-hint {
     text-align: center;
@@ -597,50 +584,25 @@ function makeTimePicker(initialValue, onChange) {
   sep.textContent = ':';
 
   // ── Minute select ──
-  const isCustom = minute !== '' && minute !== '00' && minute !== '30';
+  const minuteValue = (minute === '00' || minute === '30') ? minute : '';
 
   const minSel = document.createElement('select');
   minSel.className = 'tp-min-sel';
-  [['', '--'], ['00', '00'], ['30', '30'], ['other', 'その他']].forEach(([val, label]) => {
+  [['', '--'], ['00', '00'], ['30', '30']].forEach(([val, label]) => {
     const opt = document.createElement('option');
     opt.value = val;
     opt.textContent = label;
     minSel.appendChild(opt);
   });
-  minSel.value = isCustom ? 'other' : (minute || '');
-
-  // Custom text input (visible only when 'その他' selected)
-  const customInput = document.createElement('input');
-  customInput.type = 'text';
-  customInput.className = 'tp-min-custom';
-  customInput.placeholder = '分';
-  customInput.maxLength = 2;
-  customInput.style.display = isCustom ? '' : 'none';
-  if (isCustom) customInput.value = minute;
-
-  customInput.addEventListener('input', () => {
-    const v = customInput.value.replace(/\D/g, '').slice(0, 2);
-    customInput.value = v;
-    const n = parseInt(v, 10);
-    minute = (v !== '' && n >= 0 && n <= 59) ? String(n).padStart(2, '0') : '';
-    onChange(getValue());
-  });
+  minSel.value = minuteValue;
+  minute = minuteValue;
 
   minSel.addEventListener('change', () => {
-    const val = minSel.value;
-    if (val === 'other') {
-      customInput.style.display = '';
-      minute = '';
-      customInput.value = '';
-      customInput.focus();
-    } else {
-      customInput.style.display = 'none';
-      minute = val;
-    }
+    minute = minSel.value;
     onChange(getValue());
   });
 
-  wrap.append(hourSel, sep, minSel, customInput);
+  wrap.append(hourSel, sep, minSel);
 
   function getValue() {
     if (hour === '' || minute === '') return '';
