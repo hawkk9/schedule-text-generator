@@ -273,11 +273,109 @@
     font-size: .88rem;
   }
 
+  /* ── Google Calendar ── */
+  .gcal-section {
+    max-width: 860px;
+    margin: 20px auto 0;
+  }
+
+  .gcal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+
+  .gcal-header-label {
+    font-size: .82rem;
+    font-weight: 600;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+  }
+
+  .gcal-reset-btn {
+    background: none;
+    border: none;
+    font-size: .78rem;
+    color: #aaa;
+    cursor: pointer;
+    font-family: inherit;
+    padding: 2px 4px;
+  }
+  .gcal-reset-btn:hover { color: #555; }
+
+  .gcal-frame {
+    width: 100%;
+    height: 500px;
+    border: none;
+    border-radius: 16px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.08);
+    display: block;
+  }
+
+  .gcal-setup {
+    background: #fff;
+    border-radius: 16px;
+    padding: 24px 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.08);
+    text-align: center;
+  }
+
+  .gcal-setup p {
+    font-size: .88rem;
+    color: #555;
+    margin-bottom: 16px;
+    line-height: 1.7;
+  }
+
+  .gcal-setup a {
+    color: #0071e3;
+    text-decoration: none;
+  }
+
+  .gcal-url-row {
+    display: flex;
+    gap: 8px;
+    max-width: 560px;
+    margin: 0 auto;
+  }
+
+  .gcal-url-input {
+    flex: 1;
+    border: 1.5px solid #d0d0d5;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: .88rem;
+    outline: none;
+    font-family: inherit;
+    background: #fafafa;
+    min-width: 0;
+  }
+  .gcal-url-input:focus { border-color: #0071e3; background: #fff; }
+
+  .gcal-save-btn {
+    background: #0071e3;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 18px;
+    font-size: .88rem;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: inherit;
+    white-space: nowrap;
+    transition: background .15s;
+  }
+  .gcal-save-btn:hover { background: #0062c4; }
+
   /* ── Responsive ── */
   @media (max-width: 660px) {
     .container { grid-template-columns: 1fr; }
     .calendar-wrap { width: 100%; }
     .date-row { flex-wrap: wrap; }
+    .gcal-frame { height: 400px; }
+    .gcal-url-row { flex-direction: column; }
   }
 </style>
 </head>
@@ -311,6 +409,10 @@
       </div>
     </div>
   </div>
+</div>
+
+<div class="gcal-section" id="gcalSection">
+  <!-- JS で setup または iframe を描画 -->
 </div>
 
 <script>
@@ -650,10 +752,57 @@ document.getElementById('copyBtn').addEventListener('click', async () => {
   }
 });
 
+// ── Google Calendar embed ────────────────────────────────────
+const GCAL_KEY = 'gcal_embed_url';
+
+function renderGcal() {
+  const section = document.getElementById('gcalSection');
+  const saved = localStorage.getItem(GCAL_KEY);
+
+  if (saved) {
+    section.innerHTML = `
+      <div class="gcal-header">
+        <span class="gcal-header-label">Google カレンダー</span>
+        <button class="gcal-reset-btn" id="gcalResetBtn">URLを変更</button>
+      </div>
+      <iframe class="gcal-frame" src="${saved}" allowfullscreen></iframe>
+    `;
+    document.getElementById('gcalResetBtn').addEventListener('click', () => {
+      localStorage.removeItem(GCAL_KEY);
+      renderGcal();
+    });
+  } else {
+    section.innerHTML = `
+      <div class="gcal-setup">
+        <p>
+          Google カレンダーの埋め込みURLを貼り付けると、このページ内に表示されます。<br>
+          取得方法：<a href="https://calendar.google.com/calendar/r/settings" target="_blank">カレンダーの設定</a>
+          → 対象カレンダー →「カレンダーの統合」→「埋め込みコード」の <code>src="..."</code> の値をコピー
+        </p>
+        <div class="gcal-url-row">
+          <input class="gcal-url-input" id="gcalUrlInput" type="url"
+            placeholder="https://calendar.google.com/calendar/embed?src=...">
+          <button class="gcal-save-btn" id="gcalSaveBtn">保存</button>
+        </div>
+      </div>
+    `;
+    document.getElementById('gcalSaveBtn').addEventListener('click', () => {
+      const url = document.getElementById('gcalUrlInput').value.trim();
+      if (url.startsWith('https://calendar.google.com/')) {
+        localStorage.setItem(GCAL_KEY, url);
+        renderGcal();
+      } else {
+        document.getElementById('gcalUrlInput').style.borderColor = '#e05';
+      }
+    });
+  }
+}
+
 // ── Init ─────────────────────────────────────────────────────
 ScheduleStore.subscribe(renderOutput); // TextOutputPanel subscribes to state changes
 renderCalendar();
 renderDateList();
+renderGcal();
 </script>
 </body>
 </html>
