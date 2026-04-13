@@ -109,6 +109,7 @@
     display: flex;
     flex-direction: column;
     gap: 16px;
+    min-width: 0;
   }
 
   /* ── Date rows ── */
@@ -116,6 +117,13 @@
     display: flex;
     flex-direction: column;
     gap: 10px;
+  }
+
+  .date-list-empty {
+    background: #fff;
+    border-radius: 12px;
+    padding: 20px 16px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.07);
   }
 
   .time-options {
@@ -222,7 +230,8 @@
     text-align: center;
     color: #aaa;
     font-size: .88rem;
-    padding: 24px 0;
+    padding: 8px 0;
+    line-height: 1.6;
   }
 
   /* ── Output ── */
@@ -486,6 +495,7 @@
   @media (max-width: 660px) {
     .container { grid-template-columns: 1fr; }
     .calendar-wrap { width: 100%; }
+    .time-options { justify-content: flex-start; }
     .date-row { flex-wrap: wrap; }
     .output-header { align-items: flex-start; }
     .output-next-action { flex-wrap: wrap; }
@@ -518,7 +528,9 @@
       </label>
     </div>
     <div class="date-list" id="dateList">
-      <p class="empty-hint">カレンダーから日付を選択してください</p>
+      <div class="date-list-empty">
+        <p class="empty-hint">カレンダーから日付を選択してください</p>
+      </div>
     </div>
     <div class="output-wrap">
       <div class="output-header">
@@ -854,7 +866,7 @@ function renderDateList() {
   lateHoursLabel.classList.toggle('disabled', !hasSelectedDates);
 
   if (!hasSelectedDates) {
-    list.innerHTML = '<p class="empty-hint">カレンダーから日付を選択してください</p>';
+    list.innerHTML = '<div class="date-list-empty"><p class="empty-hint">カレンダーから日付を選択してください</p></div>';
     return;
   }
 
