@@ -268,9 +268,53 @@
     border-top: 1px solid #e5e5ea;
   }
 
+  .output-next-toggle summary {
+    list-style: none;
+    cursor: pointer;
+    font-size: .88rem;
+    font-weight: 600;
+    color: #555;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    user-select: none;
+  }
+  .output-next-toggle summary::-webkit-details-marker { display: none; }
+
+  .output-next-toggle summary::after {
+    content: '▾';
+    font-size: .85rem;
+    color: #888;
+    transition: transform .15s ease;
+  }
+  .output-next-toggle[open] summary::after { transform: rotate(180deg); }
+
+  .output-next-toggle.disabled summary {
+    color: #b8c3d1;
+    cursor: default;
+  }
+  .output-next-toggle.disabled summary::after { color: #c8d0da; }
+
+  .output-next-list {
+    margin-top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
   .output-next-action {
     display: flex;
-    justify-content: flex-start;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    background: #f5f5f7;
+    border-radius: 10px;
+    padding: 10px 12px;
+  }
+
+  .output-next-text {
+    font-size: .88rem;
+    color: #333;
   }
 
   .output-text {
@@ -422,6 +466,7 @@
     .calendar-wrap { width: 100%; }
     .date-row { flex-wrap: wrap; }
     .output-header { align-items: flex-start; }
+    .output-next-action { flex-wrap: wrap; }
     .gcal-frame { height: 400px; }
     .gcal-url-row { flex-direction: column; }
   }
@@ -456,9 +501,10 @@
         <span class="output-placeholder">日付と時間を入力すると、ここにテキストが表示されます</span>
       </div>
       <div class="output-next">
-        <div class="output-next-action">
-          <button class="gcal-add-btn" id="addToGcalBtn" disabled>Googleカレンダーに候補日を登録</button>
-        </div>
+        <details class="output-next-toggle">
+          <summary>Googleカレンダーに登録</summary>
+          <div class="output-next-list" id="gcalActionList"></div>
+        </details>
       </div>
     </div>
   </div>
@@ -789,11 +835,34 @@ function renderDateList() {
 // ── Output render ────────────────────────────────────────────
 function renderOutput() {
   const el = document.getElementById('outputText');
-  const addBtn = document.getElementById('addToGcalBtn');
+  const actionToggle = document.querySelector('.output-next-toggle');
+  const actionList = document.getElementById('gcalActionList');
   const state = ScheduleStore.getState();
   const validEntries = getValidCalendarEntries(state);
 
-  addBtn.disabled = validEntries.length === 0;
+  actionList.innerHTML = '';
+  actionToggle.classList.toggle('disabled', validEntries.length === 0);
+  if (validEntries.length === 0) actionToggle.open = false;
+
+  validEntries.forEach((entry, index) => {
+    const row = document.createElement('div');
+    row.className = 'output-next-action';
+
+    const text = document.createElement('div');
+    text.className = 'output-next-text';
+    text.textContent = TextFormatter.formatLine(entry) || `${index + 1}件目の候補`;
+
+    const btn = document.createElement('button');
+    btn.className = 'gcal-add-btn';
+    btn.type = 'button';
+    btn.textContent = 'Googleカレンダーに登録';
+    btn.addEventListener('click', () => {
+      window.open(buildGcalEventUrl(entry), '_blank', 'noopener,noreferrer');
+    });
+
+    row.append(text, btn);
+    actionList.appendChild(row);
+  });
 
   if (state.size === 0) {
     el.innerHTML = '<span class="output-placeholder">日付と時間を入力すると、ここにテキストが表示されます</span>';
@@ -833,13 +902,10 @@ document.getElementById('copyBtn').addEventListener('click', async () => {
   }
 });
 
-document.getElementById('addToGcalBtn').addEventListener('click', () => {
-  const entries = getValidCalendarEntries(ScheduleStore.getState());
-  if (entries.length === 0) return;
-
-  entries.forEach(entry => {
-    window.open(buildGcalEventUrl(entry), '_blank', 'noopener,noreferrer');
-  });
+document.querySelector('.output-next-toggle summary').addEventListener('click', (event) => {
+  if (getValidCalendarEntries(ScheduleStore.getState()).length === 0) {
+    event.preventDefault();
+  }
 });
 
 // ── Google Calendar embed ────────────────────────────────────
@@ -901,6 +967,7 @@ function initGcalToggle() {
 
 // ── Init ─────────────────────────────────────────────────────
 ScheduleStore.subscribe(renderOutput); // TextOutputPanel subscribes to state changes
+renderOutput();
 renderCalendar();
 renderDateList();
 initGcalToggle();
