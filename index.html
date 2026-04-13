@@ -804,12 +804,30 @@ function makeTimePicker(initialValue, onChange) {
 
   wrap.append(hourSel, sep, minSel);
 
+  function setValue(nextValue) {
+    if (nextValue && /^\d{2}:\d{2}$/.test(nextValue)) {
+      hour = nextValue.slice(0, 2);
+      minute = nextValue.slice(3);
+    } else {
+      hour = '';
+      minute = '00';
+    }
+    hourSel.value = hour;
+    minSel.value = (minute === '00' || minute === '30') ? minute : '00';
+  }
+
   function getValue() {
     if (hour === '' || minute === '') return '';
     return `${hour}:${minute}`;
   }
 
-  return { el: wrap, getValue };
+  return { el: wrap, getValue, setValue };
+}
+
+function addOneHour(time) {
+  const hour = Number(time.slice(0, 2));
+  const minute = time.slice(3, 5);
+  return `${String((hour + 1) % 24).padStart(2, '0')}:${minute}`;
 }
 
 // ── Date list render ─────────────────────────────────────────
@@ -855,9 +873,9 @@ function renderDateList() {
     const errMsg = document.createElement('span');
     errMsg.className = 'time-error';
 
-    function onTimeChange() {
-      const s = startPicker.getValue();
-      const e = endPicker.getValue();
+    function syncTimes(nextStart, nextEnd) {
+      const s = nextStart ?? startPicker.getValue();
+      const e = nextEnd ?? endPicker.getValue();
       if (s && e && e <= s) {
         errMsg.textContent = '終了 > 開始にしてください';
       } else {
@@ -866,11 +884,24 @@ function renderDateList() {
       ScheduleStore.updateTime(key, s, e); // → notifies renderOutput via subscribe
     }
 
-    const startPicker = makeTimePicker(entry.start, onTimeChange);
+    function onStartTimeChange(startValue) {
+      let endValue = endPicker.getValue();
+      if (startValue && !endValue) {
+        endValue = addOneHour(startValue);
+        endPicker.setValue(endValue);
+      }
+      syncTimes(startValue, endValue);
+    }
+
+    function onEndTimeChange(endValue) {
+      syncTimes(startPicker.getValue(), endValue);
+    }
+
+    const startPicker = makeTimePicker(entry.start, onStartTimeChange);
     const tilde = document.createElement('span');
     tilde.className = 'tilde';
     tilde.textContent = '〜';
-    const endPicker = makeTimePicker(entry.end, onTimeChange);
+    const endPicker = makeTimePicker(entry.end, onEndTimeChange);
 
     timeGroup.append(startPicker.el, tilde, endPicker.el, errMsg);
     row.append(label, timeGroup);
