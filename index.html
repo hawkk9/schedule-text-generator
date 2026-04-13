@@ -118,6 +118,28 @@
     gap: 10px;
   }
 
+  .time-options {
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .time-options-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: .84rem;
+    color: #666;
+    user-select: none;
+  }
+  .time-options-label.disabled {
+    color: #b8c3d1;
+    cursor: default;
+  }
+
+  .time-options-label input {
+    accent-color: #0071e3;
+  }
+
   .date-row {
     background: #fff;
     border-radius: 12px;
@@ -489,6 +511,12 @@
 
   <!-- Right -->
   <div class="right-col">
+    <div class="time-options">
+      <label class="time-options-label">
+        <input type="checkbox" id="showLateHoursToggle">
+        深夜帯も表示
+      </label>
+    </div>
     <div class="date-list" id="dateList">
       <p class="empty-hint">カレンダーから日付を選択してください</p>
     </div>
@@ -519,6 +547,8 @@
 
 <script>
 const DOW_JA = ['日','月','火','水','木','金','土'];
+const LATE_HOURS_KEY = 'show_late_hours';
+let showLateHours = false;
 
 function getValidCalendarEntries(state) {
   return [...state.keys()]
@@ -728,12 +758,21 @@ function makeTimePicker(initialValue, onChange) {
   blankOpt.textContent = '--';
   hourSel.appendChild(blankOpt);
 
-  for (let h = 0; h <= 23; h++) {
-    const opt = document.createElement('option');
-    opt.value = String(h).padStart(2, '0');
-    opt.textContent = String(h).padStart(2, '0');
-    hourSel.appendChild(opt);
+  const hourOptions = [];
+  const startHour = showLateHours ? 0 : 6;
+  for (let h = startHour; h <= 23; h++) {
+    hourOptions.push(String(h).padStart(2, '0'));
   }
+  if (hour !== '' && !hourOptions.includes(hour)) {
+    hourOptions.unshift(hour);
+  }
+
+  hourOptions.forEach((value) => {
+    const opt = document.createElement('option');
+    opt.value = value;
+    opt.textContent = value;
+    hourSel.appendChild(opt);
+  });
   hourSel.value = hour;
   hourSel.addEventListener('change', () => {
     hour = hourSel.value;
@@ -776,11 +815,18 @@ function makeTimePicker(initialValue, onChange) {
 // ── Date list render ─────────────────────────────────────────
 function renderDateList() {
   const list = document.getElementById('dateList');
+  const lateHoursToggle = document.getElementById('showLateHoursToggle');
+  const lateHoursLabel = lateHoursToggle.closest('.time-options-label');
   list.innerHTML = '';
 
   const state = ScheduleStore.getState();
+  const hasSelectedDates = state.size > 0;
 
-  if (state.size === 0) {
+  lateHoursToggle.checked = showLateHours;
+  lateHoursToggle.disabled = !hasSelectedDates;
+  lateHoursLabel.classList.toggle('disabled', !hasSelectedDates);
+
+  if (!hasSelectedDates) {
     list.innerHTML = '<p class="empty-hint">カレンダーから日付を選択してください</p>';
     return;
   }
@@ -908,6 +954,12 @@ document.querySelector('.output-next-toggle summary').addEventListener('click', 
   }
 });
 
+document.getElementById('showLateHoursToggle').addEventListener('change', (event) => {
+  showLateHours = event.target.checked;
+  localStorage.setItem(LATE_HOURS_KEY, String(showLateHours));
+  renderDateList();
+});
+
 // ── Google Calendar embed ────────────────────────────────────
 const GCAL_KEY = 'gcal_embed_url';
 const GCAL_TOGGLE_KEY = 'gcal_toggle_open';
@@ -965,8 +1017,14 @@ function initGcalToggle() {
   });
 }
 
+function initLateHoursToggle() {
+  showLateHours = localStorage.getItem(LATE_HOURS_KEY) === 'true';
+  document.getElementById('showLateHoursToggle').checked = showLateHours;
+}
+
 // ── Init ─────────────────────────────────────────────────────
 ScheduleStore.subscribe(renderOutput); // TextOutputPanel subscribes to state changes
+initLateHoursToggle();
 renderOutput();
 renderCalendar();
 renderDateList();
