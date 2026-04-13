@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>スケジュールテキストジェネレーター</title>
+<title>日程候補コピペくん</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -496,7 +496,7 @@
 </head>
 <body>
 
-<h1>スケジュールテキストジェネレーター</h1>
+<h1>日程候補コピペくん</h1>
 
 <div class="container">
   <!-- Calendar -->
@@ -588,7 +588,7 @@ function buildGcalEventUrl(entry) {
 
   const params = new URLSearchParams({
     action: 'TEMPLATE',
-    text: '予定',
+    text: '(候補)',
     dates,
     details: TextFormatter.formatLine(entry) || '',
     ctz: Intl.DateTimeFormat().resolvedOptions().timeZone
