@@ -478,7 +478,11 @@ function getValidCalendarEntries(state) {
   return [...state.keys()]
     .sort()
     .map(key => state.get(key))
-    .filter(entry => entry && entry.start && entry.end && entry.end > entry.start);
+    .filter(entry => {
+      if (!entry) return false;
+      if (!entry.start && !entry.end) return true;
+      return entry.start && entry.end && entry.end > entry.start;
+    });
 }
 
 function formatGcalDateTime(date, time) {
@@ -490,11 +494,26 @@ function formatGcalDateTime(date, time) {
   return `${y}${m}${d}T${hh}${mm}00`;
 }
 
+function formatGcalAllDayDate(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}${m}${d}`;
+}
+
 function buildGcalEventUrl(entry) {
+  const dates = (!entry.start && !entry.end)
+    ? (() => {
+        const endDate = new Date(entry.date);
+        endDate.setDate(endDate.getDate() + 1);
+        return `${formatGcalAllDayDate(entry.date)}/${formatGcalAllDayDate(endDate)}`;
+      })()
+    : `${formatGcalDateTime(entry.date, entry.start)}/${formatGcalDateTime(entry.date, entry.end)}`;
+
   const params = new URLSearchParams({
     action: 'TEMPLATE',
     text: '予定',
-    dates: `${formatGcalDateTime(entry.date, entry.start)}/${formatGcalDateTime(entry.date, entry.end)}`,
+    dates,
     details: TextFormatter.formatLine(entry) || '',
     ctz: Intl.DateTimeFormat().resolvedOptions().timeZone
   });
