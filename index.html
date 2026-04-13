@@ -680,7 +680,7 @@ function makeTimePicker(initialValue, onChange) {
   sep.textContent = ':';
 
   // ── Minute select ──
-  const minuteValue = (minute === '00' || minute === '30') ? minute : '';
+  const minuteValue = (minute === '00' || minute === '30') ? minute : '00';
 
   const minSel = document.createElement('select');
   minSel.className = 'tp-min-sel';
