@@ -525,6 +525,12 @@
         <span class="output-label">生成テキスト</span>
         <button class="copy-btn" id="copyBtn">コピー</button>
       </div>
+      <div class="time-options">
+        <label class="time-options-label">
+          <input type="checkbox" id="hideYearToggle">
+          年表示なし
+        </label>
+      </div>
       <div class="output-text" id="outputText">
         <span class="output-placeholder">日付と時間を入力すると、ここにテキストが表示されます</span>
       </div>
@@ -548,7 +554,9 @@
 <script>
 const DOW_JA = ['日','月','火','水','木','金','土'];
 const LATE_HOURS_KEY = 'show_late_hours';
+const HIDE_YEAR_KEY = 'hide_year_in_output';
 let showLateHours = false;
+let hideYearInOutput = false;
 
 function getValidCalendarEntries(state) {
   return [...state.keys()]
@@ -631,16 +639,17 @@ const TextFormatter = (() => {
   }
 
   // Returns formatted line string, or null if entry has a time validation error
-  function formatLine(entry) {
+  function formatLine(entry, options = {}) {
     const { date, start, end } = entry;
     if (start && end && end <= start) return null; // バリデーションエラー → 除外
+    const { hideYear = false } = options;
 
     const y = date.getFullYear();
     const m = String(date.getMonth() + 1).padStart(2, '0');
     const d = String(date.getDate()).padStart(2, '0');
     const dow = getDayOfWeekJa(date);
 
-    let line = `${y}/${m}/${d}(${dow})`;
+    let line = hideYear ? `${m}/${d}(${dow})` : `${y}/${m}/${d}(${dow})`;
     if (start || end) {
       line += ` ${start || '--:--'}~${end || '--:--'}`;
     }
@@ -648,11 +657,11 @@ const TextFormatter = (() => {
   }
 
   // Returns formatted text (newline-joined), or "" when state is empty
-  function formatEntries(state) {
+  function formatEntries(state, options = {}) {
     if (state.size === 0) return '';
     const lines = [...state.keys()]
       .sort()
-      .map(key => formatLine(state.get(key)))
+      .map(key => formatLine(state.get(key), options))
       .filter(line => line !== null);
     return lines.join('\n');
   }
@@ -914,12 +923,18 @@ function renderOutput() {
   const el = document.getElementById('outputText');
   const actionToggle = document.querySelector('.output-next-toggle');
   const actionList = document.getElementById('gcalActionList');
+  const hideYearToggle = document.getElementById('hideYearToggle');
+  const hideYearLabel = hideYearToggle.closest('.time-options-label');
   const state = ScheduleStore.getState();
   const validEntries = getValidCalendarEntries(state);
+  const hasSelectedDates = state.size > 0;
 
   actionList.innerHTML = '';
   actionToggle.classList.toggle('disabled', validEntries.length === 0);
   if (validEntries.length === 0) actionToggle.open = false;
+  hideYearToggle.checked = hideYearInOutput;
+  hideYearToggle.disabled = !hasSelectedDates;
+  hideYearLabel.classList.toggle('disabled', !hasSelectedDates);
 
   validEntries.forEach((entry, index) => {
     const row = document.createElement('div');
@@ -946,7 +961,7 @@ function renderOutput() {
     return;
   }
 
-  const text = TextFormatter.formatEntries(state);
+  const text = TextFormatter.formatEntries(state, { hideYear: hideYearInOutput });
   if (!text) {
     el.innerHTML = '<span class="output-placeholder">時間を入力してください（終了 > 開始）</span>';
   } else {
@@ -989,6 +1004,12 @@ document.getElementById('showLateHoursToggle').addEventListener('change', (event
   showLateHours = event.target.checked;
   localStorage.setItem(LATE_HOURS_KEY, String(showLateHours));
   renderDateList();
+});
+
+document.getElementById('hideYearToggle').addEventListener('change', (event) => {
+  hideYearInOutput = event.target.checked;
+  localStorage.setItem(HIDE_YEAR_KEY, String(hideYearInOutput));
+  renderOutput();
 });
 
 // ── Google Calendar embed ────────────────────────────────────
@@ -1053,9 +1074,15 @@ function initLateHoursToggle() {
   document.getElementById('showLateHoursToggle').checked = showLateHours;
 }
 
+function initHideYearToggle() {
+  hideYearInOutput = localStorage.getItem(HIDE_YEAR_KEY) === 'true';
+  document.getElementById('hideYearToggle').checked = hideYearInOutput;
+}
+
 // ── Init ─────────────────────────────────────────────────────
 ScheduleStore.subscribe(renderOutput); // TextOutputPanel subscribes to state changes
 initLateHoursToggle();
+initHideYearToggle();
 renderOutput();
 renderCalendar();
 renderDateList();
